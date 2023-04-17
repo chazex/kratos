@@ -55,8 +55,11 @@ func (e *Error) WithMetadata(md map[string]string) *Error {
 	return err
 }
 
+// 将kratos.Error转换为grpc.Status
+
 // GRPCStatus returns the Status represented by se.
 func (e *Error) GRPCStatus() *status.Status {
+	// 将http
 	s, _ := status.New(httpstatus.ToGRPCCode(int(e.Code)), e.Message).
 		WithDetails(&errdetails.ErrorInfo{
 			Reason:   e.Reason,
@@ -124,22 +127,29 @@ func Clone(err *Error) *Error {
 	}
 }
 
+// 尝试将错误转换成kratos.Error
+
 // FromError try to convert an error to *Error.
 // It supports wrapped errors.
 func FromError(err error) *Error {
 	if err == nil {
 		return nil
 	}
+	// 已经是*Error类型
 	if se := new(Error); errors.As(err, &se) {
 		return se
 	}
+	// 校验是否为grpc error(是否实现了接口GRPCStatus)（这种情况，应该是grpc server中，出现了grpc的原生错误, 或者作为client调用了grpc，讲返回的错误直接向上抛）
 	gs, ok := status.FromError(err)
 	if !ok {
 		return New(UnknownCode, UnknownReason, err.Error())
 	}
+	// 是grpc error， 转换为*Error
 	ret := New(
+		// grpc code 转换为 http code
 		httpstatus.FromGRPCCode(gs.Code()),
 		UnknownReason,
+		// grpc message
 		gs.Message(),
 	)
 	for _, detail := range gs.Details() {
