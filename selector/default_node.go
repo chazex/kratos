@@ -6,6 +6,7 @@ import (
 	"github.com/go-kratos/kratos/v2/registry"
 )
 
+// DefaultNode 默认Node实现
 // DefaultNode is selector node
 type DefaultNode struct {
 	scheme   string
@@ -46,6 +47,7 @@ func (n *DefaultNode) Metadata() map[string]string {
 	return n.metadata
 }
 
+// NewNode 创建一个 DefaultNode
 // NewNode new node
 func NewNode(scheme, addr string, ins *registry.ServiceInstance) Node {
 	n := &DefaultNode{

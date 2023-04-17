@@ -13,21 +13,26 @@ var ErrNoAvailable = errors.ServiceUnavailable("no_available_node", "")
 type Selector interface {
 	Rebalancer
 
+	// Select 选择一个节点
 	// Select nodes
 	// if err == nil, selected and done must not be empty.
 	Select(ctx context.Context, opts ...SelectOption) (selected Node, done DoneFunc, err error)
 }
 
+// Rebalancer 节点负载均衡器，更新内部服务节点
 // Rebalancer is nodes rebalancer.
 type Rebalancer interface {
 	// Apply is apply all nodes when any changes happen
 	Apply(nodes []Node)
 }
 
+// Builder selector构建接口
 // Builder build selector
 type Builder interface {
 	Build() Selector
 }
+
+// Node 定义节点接口，代表一个服务节点
 
 // Node is node interface.
 type Node interface {

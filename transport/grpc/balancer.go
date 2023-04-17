@@ -20,6 +20,7 @@ var (
 )
 
 func init() {
+	// 借助grpc原生的baseBalancer做封装
 	b := base.NewBalancerBuilder(
 		balancerName,
 		&balancerBuilder{

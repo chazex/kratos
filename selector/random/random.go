@@ -47,8 +47,10 @@ func NewBuilder(opts ...Option) selector.Builder {
 		opt(&option)
 	}
 	return &selector.DefaultBuilder{
+		// selector 内部使用的是random负载均衡
 		Balancer: &Builder{},
-		Node:     &direct.Builder{},
+		// WeightedNode用到是directNode
+		Node: &direct.Builder{},
 	}
 }
 

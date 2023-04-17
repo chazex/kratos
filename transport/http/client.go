@@ -174,7 +174,7 @@ func NewClient(ctx context.Context, opts ...ClientOption) (*Client, error) {
 	}
 	selector := selector.GlobalSelector().Build()
 	var r *resolver
-	if options.discovery != nil {
+	if options.discovery != nil { // 在有服务发现的前提下，我们才做负载均衡
 		if target.Scheme == "discovery" {
 			if r, err = newResolver(ctx, options.discovery, target, selector, options.block, insecure); err != nil {
 				return nil, fmt.Errorf("[http client] new resolver failed!err: %v", options.endpoint)
@@ -284,7 +284,7 @@ func (client *Client) do(req *http.Request) (*http.Response, error) {
 			err  error
 			node selector.Node
 		)
-		if node, done, err = client.selector.Select(req.Context(), selector.WithNodeFilter(client.opts.nodeFilters...)); err != nil {
+		if node, done, err = client.selector.Select(req.Context(), selector.WithNodeFilter(client.opts.nodeFilters...)); err != nil { // 用负载均衡selector选出一个可用节点
 			return nil, errors.ServiceUnavailable("NODE_NOT_FOUND", err.Error())
 		}
 		if client.insecure {

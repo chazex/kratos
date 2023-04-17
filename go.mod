@@ -8,6 +8,7 @@ require (
 	github.com/go-playground/form/v4 v4.2.0
 	github.com/golang-jwt/jwt/v4 v4.4.1
 	github.com/google/uuid v1.3.0
+	github.com/google/wire v0.5.0 // indirect
 	github.com/gorilla/mux v1.8.0
 	github.com/imdario/mergo v0.3.12
 	go.opentelemetry.io/otel v1.7.0

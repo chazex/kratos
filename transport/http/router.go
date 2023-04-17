@@ -48,17 +48,27 @@ func (r *Router) Group(prefix string, filters ...FilterFunc) *Router {
 
 // Handle registers a new route with a matcher for the URL path and method.
 func (r *Router) Handle(method, relativePath string, h HandlerFunc, filters ...FilterFunc) {
+	// 参数h是用户处理函数(实际上是业务中间件+处理逻辑)，即proto文件定义的接口的具体实现，再用业务层的中间件进行了一层层的包裹
+	// 由于上层传过来的是kratos的HandlerFunc类型，所以要转换成net.http.Hander类型。因为这个函数要注册到gorilla/mux里面，所以他要遵循规则（路由处理函数要实现net.http.Hander）
 	next := http.Handler(http.HandlerFunc(func(res http.ResponseWriter, req *http.Request) {
 		ctx := r.pool.Get().(Context)
-		ctx.Reset(res, req)
+		// 由于这块代码的上游是路由中间件（gorilla/mux的middleware），所以这里的res和req是来自于kratos.server.filter()方法中，重置的req和res
+		ctx.Reset(res, req) //由于ctx是从pool中取到的，所以用之前，先把res,req重置一下
+		// 调用业务
 		if err := h(ctx); err != nil {
+			// 业务处理函数返回错误，使用server的error encoder
 			r.srv.ene(res, req, err)
 		}
-		ctx.Reset(nil, nil)
+		ctx.Reset(nil, nil) // 同理，用完之后，扔回pool之前，要reset为nil
 		r.pool.Put(ctx)
 	}))
+	// 这里的filters，是上游传过来的，但是我找了下代码都是空。而且上游是proto生成的，貌似没啥用。
+	// 如果不用proto的方式，自己手动实现http代码，然后注册到server里面，应该会有这种场景，比如stream 式的grpc。
+	// 并且这样，就可以自己决定是否传入filters了.
 	next = FilterChain(filters...)(next)
+	// 这个filters，我也没找到哪里会注册。 估计也是用户自己实现http，然后在Group里面加
 	next = FilterChain(r.filters...)(next)
+	// 在mux上注册一个新的路由(因为kratos使用的是gorilla/mux，所以最终要是要注册到这上面的)
 	r.srv.router.Handle(path.Join(r.prefix, relativePath), next).Methods(method)
 }
 

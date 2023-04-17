@@ -2,13 +2,19 @@ package registry
 
 import "context"
 
+// Registrar 服务注册接口 （server用）
+
 // Registrar is service registrar.
 type Registrar interface {
+	// Register 注册方法
 	// Register the registration.
 	Register(ctx context.Context, service *ServiceInstance) error
+	// Deregister 反注册方法
 	// Deregister the registration.
 	Deregister(ctx context.Context, service *ServiceInstance) error
 }
+
+// Discovery 服务发现接口（client用）
 
 // Discovery is service discovery.
 type Discovery interface {
@@ -29,6 +35,8 @@ type Watcher interface {
 	Stop() error
 }
 
+// ServiceInstance 服务注册的实例
+
 // ServiceInstance is an instance of a service in a discovery system.
 type ServiceInstance struct {
 	// ID is the unique instance ID as registered.
@@ -43,5 +51,5 @@ type ServiceInstance struct {
 	// schema:
 	//   http://127.0.0.1:8000?isSecure=false
 	//   grpc://127.0.0.1:9000?isSecure=false
-	Endpoints []string `json:"endpoints"`
+	Endpoints []string `json:"endpoints"` // 服务对应的所有可用实例
 }

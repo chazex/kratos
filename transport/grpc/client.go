@@ -132,10 +132,12 @@ func dial(ctx context.Context, insecure bool, opts ...ClientOption) (*grpc.Clien
 		ints = append(ints, options.ints...)
 	}
 	grpcOpts := []grpc.DialOption{
+		// 指定 负载均衡器
 		grpc.WithDefaultServiceConfig(fmt.Sprintf(`{"loadBalancingConfig": [{"%s":{}}]}`, options.balancerName)),
 		grpc.WithChainUnaryInterceptor(ints...),
 	}
 	if options.discovery != nil {
+		// 指定服务发现
 		grpcOpts = append(grpcOpts,
 			grpc.WithResolvers(
 				discovery.NewBuilder(
@@ -152,6 +154,7 @@ func dial(ctx context.Context, insecure bool, opts ...ClientOption) (*grpc.Clien
 	if len(options.grpcOpts) > 0 {
 		grpcOpts = append(grpcOpts, options.grpcOpts...)
 	}
+	// 真实连接gRPC
 	return grpc.DialContext(ctx, options.endpoint, grpcOpts...)
 }
 

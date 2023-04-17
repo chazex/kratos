@@ -13,8 +13,13 @@ const (
 	ClientClosed = 499
 )
 
+// 此接口的目的在于 实现kratos.Error.Code 和 grpc code之间的转换。
+// kratos的设计理念是kratos.Error.Code 就是 http的code，所以默认实现，就是做http code  和 grpc code的转换
+
 // Converter is a status converter.
 type Converter interface {
+	// ToGRPCCode Http error Code转换为grpc Code
+
 	// ToGRPCCode converts an HTTP error code into the corresponding gRPC response status.
 	ToGRPCCode(code int) codes.Code
 
@@ -55,6 +60,8 @@ func (c statusConverter) ToGRPCCode(code int) codes.Code {
 		return codes.DeadlineExceeded
 	case ClientClosed:
 		return codes.Canceled
+	case 12345:
+		return 12345
 	}
 	return codes.Unknown
 }

@@ -117,20 +117,20 @@ func Listener(lis net.Listener) ServerOption {
 // Server is an HTTP server wrapper.
 type Server struct {
 	*http.Server
-	lis         net.Listener
+	lis         net.Listener // 包裹原生的*http.Server
 	tlsConf     *tls.Config
 	endpoint    *url.URL
 	err         error
 	network     string
 	address     string
 	timeout     time.Duration
-	filters     []FilterFunc
+	filters     []FilterFunc // http层的中间件
 	middleware  matcher.Matcher
 	dec         DecodeRequestFunc
 	enc         EncodeResponseFunc
 	ene         EncodeErrorFunc
 	strictSlash bool
-	router      *mux.Router
+	router      *mux.Router // 使用的是著名的gorilla/mux
 }
 
 // NewServer creates an HTTP server by options.
@@ -148,12 +148,12 @@ func NewServer(opts ...ServerOption) *Server {
 	for _, o := range opts {
 		o(srv)
 	}
-	srv.router = mux.NewRouter().StrictSlash(srv.strictSlash)
+	srv.router = mux.NewRouter().StrictSlash(srv.strictSlash) // 路由处理器(著名的gorilla/mux),将http请求路由到指定的用户函数中。 这里的router一定是实现了原生net.http.Handler接口，所有的请求都需要到这里。
 	srv.router.NotFoundHandler = http.DefaultServeMux
 	srv.router.MethodNotAllowedHandler = http.DefaultServeMux
-	srv.router.Use(srv.filter())
-	srv.Server = &http.Server{
-		Handler:   FilterChain(srv.filters...)(srv.router),
+	srv.router.Use(srv.filter()) // 对gorilla/mux的路由注册middleware。在路由匹配成功时，会用中间件包裹处理函数 Handler
+	srv.Server = &http.Server{ // 原生HTTP Server
+		Handler:   FilterChain(srv.filters...)(srv.router), // 把router(gorilla/mux)当作洋葱芯，包裹外层用户自定义的中间件。
 		TLSConfig: srv.tlsConf,
 	}
 	return srv
@@ -220,6 +220,7 @@ func (s *Server) ServeHTTP(res http.ResponseWriter, req *http.Request) {
 
 func (s *Server) filter() mux.MiddlewareFunc {
 	return func(next http.Handler) http.Handler {
+		// 强制转换成http.HandlerFunc类型，http.handlerFunc实现了http.Handler接口,它的ServerHTTP()方法，就是调用http.HandlerFunc自己
 		return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			var (
 				ctx    context.Context
@@ -238,10 +239,12 @@ func (s *Server) filter() mux.MiddlewareFunc {
 				pathTemplate, _ = route.GetPathTemplate()
 			}
 
+			// 其实就是，给ctx套了一层value, 值是tr，再重新复制了一份request，并且新的request使用新的ctx.
+			// if tr, ok := transport.FromServerContext(ctx); ok { 官网中说，中间件可以通过这种方式获取transport，获取到的transport就是从这里设置的
 			tr := &Transport{
 				operation:    pathTemplate,
 				pathTemplate: pathTemplate,
-				reqHeader:    headerCarrier(req.Header),
+				reqHeader:    headerCarrier(req.Header), // 强制类型转换，转换从net.http.Header
 				replyHeader:  headerCarrier(w.Header()),
 				request:      req,
 			}
@@ -271,7 +274,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if err := s.listenAndEndpoint(); err != nil {
 		return err
 	}
-	s.BaseContext = func(net.Listener) context.Context {
+	s.BaseContext = func(net.Listener) context.Context { // 通过闭包，保留了原始的ctx
 		return ctx
 	}
 	log.Infof("[HTTP] server listening on: %s", s.lis.Addr().String())
@@ -279,7 +282,7 @@ func (s *Server) Start(ctx context.Context) error {
 	if s.tlsConf != nil {
 		err = s.ServeTLS(s.lis, "", "")
 	} else {
-		err = s.Serve(s.lis)
+		err = s.Serve(s.lis) // 因为包裹了一层原生的http.Server ，所以这里启动的就是原生http服务
 	}
 	if !errors.Is(err, http.ErrServerClosed) {
 		return err

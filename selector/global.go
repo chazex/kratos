@@ -1,5 +1,6 @@
 package selector
 
+// 全局selector构建器
 var globalSelector Builder
 
 // GlobalSelector returns global selector builder.

@@ -49,7 +49,7 @@ type resolver struct {
 }
 
 func newResolver(ctx context.Context, discovery registry.Discovery, target *Target, rebalancer selector.Rebalancer, block, insecure bool) (*resolver, error) {
-	watcher, err := discovery.Watch(ctx, target.Endpoint)
+	watcher, err := discovery.Watch(ctx, target.Endpoint) // 服务发现的watcher
 	if err != nil {
 		return nil, err
 	}
