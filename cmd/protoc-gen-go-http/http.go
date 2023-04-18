@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"regexp"
 	"strings"
@@ -62,7 +63,7 @@ func generateFileContent(gen *protogen.Plugin, file *protogen.File, g *protogen.
 	}
 }
 
-func genService(gen *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, service *protogen.Service, omitempty bool) {
+func genService(_ *protogen.Plugin, file *protogen.File, g *protogen.GeneratedFile, service *protogen.Service, omitempty bool) {
 	if service.Desc.Options().(*descriptorpb.ServiceOptions).GetDeprecated() {
 		g.P("//")
 		g.P(deprecationComment)
@@ -85,7 +86,7 @@ func genService(gen *protogen.Plugin, file *protogen.File, g *protogen.Generated
 			sd.Methods = append(sd.Methods, buildHTTPRule(g, method, rule))
 		} else if !omitempty {
 			path := fmt.Sprintf("/%s/%s", service.Desc.FullName(), method.Desc.Name())
-			sd.Methods = append(sd.Methods, buildMethodDesc(g, method, "POST", path))
+			sd.Methods = append(sd.Methods, buildMethodDesc(g, method, http.MethodPost, path))
 		}
 	}
 	if len(sd.Methods) != 0 {
@@ -119,19 +120,19 @@ func buildHTTPRule(g *protogen.GeneratedFile, m *protogen.Method, rule *annotati
 	switch pattern := rule.Pattern.(type) {
 	case *annotations.HttpRule_Get:
 		path = pattern.Get
-		method = "GET"
+		method = http.MethodGet
 	case *annotations.HttpRule_Put:
 		path = pattern.Put
-		method = "PUT"
+		method = http.MethodPut
 	case *annotations.HttpRule_Post:
 		path = pattern.Post
-		method = "POST"
+		method = http.MethodPost
 	case *annotations.HttpRule_Delete:
 		path = pattern.Delete
-		method = "DELETE"
+		method = http.MethodDelete
 	case *annotations.HttpRule_Patch:
 		path = pattern.Patch
-		method = "PATCH"
+		method = http.MethodPatch
 	case *annotations.HttpRule_Custom:
 		path = pattern.Custom.Path
 		method = pattern.Custom.Kind
@@ -139,7 +140,7 @@ func buildHTTPRule(g *protogen.GeneratedFile, m *protogen.Method, rule *annotati
 	body = rule.Body
 	responseBody = rule.ResponseBody
 	md := buildMethodDesc(g, m, method, path)
-	if method == "GET" || method == "DELETE" {
+	if method == http.MethodGet || method == http.MethodDelete {
 		if body != "" {
 			_, _ = fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: %s %s body should not be declared.\n", method, path)
 		}
@@ -197,12 +198,17 @@ func buildMethodDesc(g *protogen.GeneratedFile, m *protogen.Method, method, path
 			}
 		}
 	}
+	comment := m.Comments.Leading.String() + m.Comments.Trailing.String()
+	if comment != "" {
+		comment = "// " + m.GoName + strings.TrimPrefix(strings.TrimSuffix(comment, "\n"), "//")
+	}
 	return &methodDesc{
 		Name:         m.GoName,
 		OriginalName: string(m.Desc.Name()),
 		Num:          methodSets[m.GoName],
 		Request:      g.QualifiedGoIdent(m.Input.GoIdent),
 		Reply:        g.QualifiedGoIdent(m.Output.GoIdent),
+		Comment:      comment,
 		Path:         path,
 		Method:       method,
 		HasVars:      len(vars) > 0,
@@ -213,7 +219,7 @@ func buildPathVars(path string) (res map[string]*string) {
 	if strings.HasSuffix(path, "/") {
 		fmt.Fprintf(os.Stderr, "\u001B[31mWARN\u001B[m: Path %s should not end with \"/\" \n", path)
 	}
-	pattern := regexp.MustCompile(`(?i){([a-z\.0-9_\s]*)=?([^{}]*)}`)
+	pattern := regexp.MustCompile(`(?i){([a-z.0-9_\s]*)=?([^{}]*)}`)
 	matches := pattern.FindAllStringSubmatch(path, -1)
 	res = make(map[string]*string, len(matches))
 	for _, m := range matches {
@@ -255,8 +261,8 @@ func camelCaseVars(s string) string {
 // drop the underscore and convert the letter to upper case.
 // There is a remote possibility of this rewrite causing a name collision,
 // but it's so remote we're prepared to pretend it's nonexistent - since the
-// C++ generator lowercases names, it's extremely unlikely to have two fields
-// with different capitalizations.
+// C++ generator lowercase names, it's extremely unlikely to have two fields
+// with different capitalization.
 // In short, _my_field_name_2 becomes XMyFieldName_2.
 func camelCase(s string) string {
 	if s == "" {

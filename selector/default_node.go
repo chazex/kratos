@@ -6,6 +6,8 @@ import (
 	"github.com/go-kratos/kratos/v2/registry"
 )
 
+var _ Node = (*DefaultNode)(nil)
+
 // DefaultNode 默认Node实现
 // DefaultNode is selector node
 type DefaultNode struct {

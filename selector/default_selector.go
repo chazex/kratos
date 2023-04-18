@@ -5,6 +5,12 @@ import (
 	"sync/atomic"
 )
 
+var (
+	_ Rebalancer = (*Default)(nil)
+	_ Builder    = (*DefaultBuilder)(nil)
+)
+
+
 // Default 是selector的默认实现。 它内部通过Balancer进行负载均衡
 // selector除了 balancer，还有过滤作用
 

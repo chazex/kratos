@@ -2,7 +2,7 @@ package http
 
 import "net/http"
 
-// FilterFunc is a function which receives an http.Handler and returns another http.Handler.
+// FilterFunc is a function which receives a http.Handler and returns another http.Handler.
 type FilterFunc func(http.Handler) http.Handler
 
 // 将链式的中间件（数组），组成洋葱状。 数组index越大，则处于洋葱的越内测。

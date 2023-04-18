@@ -91,10 +91,17 @@ func (a *App) Run() error {
 	a.mu.Lock()
 	a.instance = instance
 	a.mu.Unlock()
+	sctx := NewContext(a.ctx, a)
 	// error group 内部创建了cancel context，某一个失败了，就会执行cancel()
-	eg, ctx := errgroup.WithContext(NewContext(a.ctx, a))
+	eg, ctx := errgroup.WithContext(sctx)
 	// 这个WaitGroup是用来确保所有的服务已经开始启动，然后才能开始做服务注册
 	wg := sync.WaitGroup{}
+
+	for _, fn := range a.opts.beforeStart {
+		if err = fn(sctx); err != nil {
+			return err
+		}
+	}
 	// 依次启动服务
 	for _, srv := range a.opts.servers {
 		srv := srv
@@ -112,7 +119,7 @@ func (a *App) Run() error {
 		wg.Add(1)
 		eg.Go(func() error {
 			wg.Done() // here is to ensure server start has begun running before register, so defer is not needed
-			return srv.Start(NewContext(a.opts.ctx, a))
+			return srv.Start(sctx)
 		})
 	}
 	wg.Wait()
@@ -121,10 +128,16 @@ func (a *App) Run() error {
 		rctx, rcancel := context.WithTimeout(ctx, a.opts.registrarTimeout)
 		defer rcancel()
 		// 注册
-		if err := a.opts.registrar.Register(rctx, instance); err != nil {
+		if err = a.opts.registrar.Register(rctx, instance); err != nil {
 			return err
 		}
 	}
+	for _, fn := range a.opts.afterStart {
+		if err = fn(sctx); err != nil {
+			return err
+		}
+	}
+
 	// 启动协程，监听信号
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, a.opts.sigs...)
@@ -139,14 +152,22 @@ func (a *App) Run() error {
 	})
 	// 函数阻塞，等待服务退出
 	// 1. 等待优雅退出协程结束，2. 等待服务启动协程退出
-	if err := eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
+	if err = eg.Wait(); err != nil && !errors.Is(err, context.Canceled) {
 		return err
 	}
-	return nil
+	for _, fn := range a.opts.afterStop {
+		err = fn(sctx)
+	}
+	return err
 }
 
 // Stop gracefully stops the application.
-func (a *App) Stop() error {
+func (a *App) Stop() (err error) {
+	sctx := NewContext(a.ctx, a)
+	for _, fn := range a.opts.beforeStop {
+		err = fn(sctx)
+	}
+
 	a.mu.Lock()
 	instance := a.instance
 	a.mu.Unlock()
@@ -155,7 +176,7 @@ func (a *App) Stop() error {
 		ctx, cancel := context.WithTimeout(NewContext(a.ctx, a), a.opts.registrarTimeout)
 		defer cancel()
 		// 注销
-		if err := a.opts.registrar.Deregister(ctx, instance); err != nil {
+		if err = a.opts.registrar.Deregister(ctx, instance); err != nil {
 			return err
 		}
 	}
@@ -163,7 +184,7 @@ func (a *App) Stop() error {
 	if a.cancel != nil {
 		a.cancel()
 	}
-	return nil
+	return err
 }
 
 func (a *App) buildInstance() (*registry.ServiceInstance, error) {
