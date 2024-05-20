@@ -33,6 +33,9 @@ type Builder interface {
 }
 
 // Node 定义节点接口，代表一个服务节点
+// 注意Node是在负载均衡中代表一个节点的信息，ServiceInstance 是在服务发现中代表节点中的信息。 由于服务发现和负载均衡，经常一起使用，所以这两个示例经常弄混。
+// 一般是通过服务发现获取到 ServiceInstance， 然后转换成Node， 将Node存储到本地列表中，然后做负载均衡。
+// selector.NewNode() 方法就是将 ServiceInstance 转换为Node的方法。
 
 // Node is node interface.
 type Node interface {

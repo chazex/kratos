@@ -39,6 +39,8 @@ func (n *Node) Pick() selector.DoneFunc {
 	return func(ctx context.Context, di selector.DoneInfo) {}
 }
 
+// 计算节点的负载，因为是direct，所以使用默认值（defaultWeight）
+
 // Weight is node effective weight
 func (n *Node) Weight() float64 {
 	if n.InitialWeight() != nil {
@@ -47,6 +49,7 @@ func (n *Node) Weight() float64 {
 	return defaultWeight
 }
 
+// PickElapsed 这个节点在最近两次被pick的时间间隔
 func (n *Node) PickElapsed() time.Duration {
 	return time.Duration(time.Now().UnixNano() - atomic.LoadInt64(&n.lastPick))
 }

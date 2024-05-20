@@ -30,7 +30,7 @@ type WeightedNode interface {
 	// Weight is the runtime calculated weight
 	Weight() float64
 
-	// Pick 选择节点: 这个方法，并不是做负载均衡操作。名字和注释容易迷惑人，它的作用是在负载均衡选择了当前节点，请求开始前记录一些东西，在请求开始后，有记录一些东西。 记录的东西主要用于负载计算
+	// Pick 选择节点: 这个方法，并不是做负载均衡操作。名字和注释容易迷惑人，它的作用是在负载均衡选择了当前节点，请求开始前记录一些东西，在请求开始后，又记录一些东西。 记录的东西主要用于负载计算
 	// Pick the node
 	Pick() DoneFunc
 

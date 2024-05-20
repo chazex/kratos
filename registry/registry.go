@@ -22,11 +22,15 @@ type Registrar interface {
 
 // Discovery is service discovery.
 type Discovery interface {
+	// GetService 根据服务名获取服务节点列表
 	// GetService return the service instances in memory according to the service name.
 	GetService(ctx context.Context, serviceName string) ([]*ServiceInstance, error)
+	// Watch 监听某一个服务名的节点变化情况。
 	// Watch creates a watcher according to the service name.
 	Watch(ctx context.Context, serviceName string) (Watcher, error)
 }
+
+// Watcher 接口是配合服务发现接口(Discovery)来一起使用的。
 
 // Watcher is service watcher.
 type Watcher interface {
@@ -34,6 +38,11 @@ type Watcher interface {
 	// 1.the first time to watch and the service instance list is not empty.
 	// 2.any service instance changes found.
 	// if the above two conditions are not met, it will block until context deadline exceeded or canceled
+	// 这里叫做Next()方法，感觉稍微有点容易混淆，因为Next，一般用来表示获取下一个，我们很容易理解成获取下一个节点。
+	// 这个函数实际上是，阻塞监听服务节点变更事件，有变化，则返回新的节点列表
+	//	当首次调用的时候，会从注册中心（如etcd）查询所有节点列表并返回
+	//  当不是首次调用的时候，会检查etcd是否发生变更(通过etcd的变更通知)，如果有变更，则会拉取新的服务列表，并返回。 如果没有变更，会阻塞。
+	// 由于没有变更会阻塞，所以这个函数一般是在一个协程中异步调用，并且是在一个循环中
 	Next() ([]*ServiceInstance, error)
 	// Stop close the watcher.
 	Stop() error

@@ -112,6 +112,7 @@ func (r *Registry) GetService(ctx context.Context, name string) ([]*registry.Ser
 	}
 	items := make([]*registry.ServiceInstance, 0, len(resp.Kvs))
 	for _, kv := range resp.Kvs {
+		// 解码为 kratos的registry.ServiceInstance
 		si, err := unmarshal(kv.Value)
 		if err != nil {
 			return nil, err

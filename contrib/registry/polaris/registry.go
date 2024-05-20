@@ -421,6 +421,7 @@ func instancesToServiceInstances(instances []model.Instance) []*registry.Service
 	return serviceInstances
 }
 
+// 将polaris的节点信息，转换为kratos框架的polaris信息
 func instanceToServiceInstance(instance model.Instance) *registry.ServiceInstance {
 	metadata := instance.GetMetadata()
 	// Usually, it won't fail in kratos if register correctly

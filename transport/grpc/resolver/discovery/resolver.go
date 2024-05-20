@@ -35,6 +35,7 @@ func (r *discoveryResolver) watch() {
 			return
 		default:
 		}
+		// 监听到服务列表的变化
 		ins, err := r.w.Next()
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -44,6 +45,7 @@ func (r *discoveryResolver) watch() {
 			time.Sleep(time.Second)
 			continue
 		}
+		// 通知grpc-go
 		r.update(ins)
 	}
 }
@@ -87,6 +89,7 @@ func (r *discoveryResolver) update(ins []*registry.ServiceInstance) {
 		log.Warnf("[resolver] Zero endpoint found,refused to write, instances: %v", ins)
 		return
 	}
+	// 真正通知grpc-go
 	err := r.cc.UpdateState(resolver.State{Addresses: addrs})
 	if err != nil {
 		log.Errorf("[resolver] failed to update state: %s", err)

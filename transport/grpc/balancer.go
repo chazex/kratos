@@ -31,9 +31,12 @@ func init() {
 	balancer.Register(b)
 }
 
+// 在这里称为balancerBuilder，实际在grpc中，是baseBalancer中的pickerBuilder
 type balancerBuilder struct {
 	builder selector.Builder
 }
+
+// 在什么情况下，这个方法会被调用？ 应该是grpc中服务节点触发变化的时候
 
 // Build creates a grpc Picker.
 func (b *balancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
@@ -41,6 +44,8 @@ func (b *balancerBuilder) Build(info base.PickerBuildInfo) balancer.Picker {
 		// Block the RPC until a new picker is available via UpdateState().
 		return base.NewErrPicker(balancer.ErrNoSubConnAvailable)
 	}
+
+	// 根据就绪的grpc.SubConn构建kratos的节点列表。
 	nodes := make([]selector.Node, 0, len(info.ReadySCs))
 	for conn, info := range info.ReadySCs {
 		ins, _ := info.Address.Attributes.Value("rawServiceInstance").(*registry.ServiceInstance)
@@ -70,6 +75,7 @@ func (p *balancerPicker) Pick(info balancer.PickInfo) (balancer.PickResult, erro
 		}
 	}
 
+	// done 执行完成grpc请求之后，调用done方法，来做一些统计，用于计算负载吧？
 	n, done, err := p.selector.Select(info.Ctx, selector.WithNodeFilter(filters...))
 	if err != nil {
 		return balancer.PickResult{}, err
@@ -99,6 +105,8 @@ func (t Trailer) Get(k string) string {
 	}
 	return ""
 }
+
+// selector.Node做了一个扩展，用于对接grpc。 因为grpc中picker得到的balancer.PickResult，需要有grpc.SubConn
 
 type grpcNode struct {
 	selector.Node

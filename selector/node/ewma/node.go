@@ -25,13 +25,15 @@ var (
 	_ selector.WeightedNodeBuilder = (*Builder)(nil)
 )
 
+// Node 一个后端服务节点实例
 // Node is endpoint instance
 type Node struct {
 	selector.Node
 
 	// client statistic data
-	lag       int64
-	success   uint64
+	lag     int64
+	success uint64
+	// 这个节点正在处理的请求数量（只是对于单个client的请求数量），如果有多个客户端的话，数量应该不止这个数
 	inflight  int64
 	inflights *list.List
 	// last collected timestamp
@@ -40,6 +42,7 @@ type Node struct {
 	predict   int64
 	// request number in a period time
 	reqs int64
+	// last 最近一次被负载均衡器选中的时间戳
 	// last lastPick timestamp
 	lastPick int64
 
@@ -121,6 +124,7 @@ func (n *Node) load() (load uint64) {
 func (n *Node) Pick() selector.DoneFunc {
 	now := time.Now().UnixNano()
 	atomic.StoreInt64(&n.lastPick, now)
+	// 正在处理中的请求+1
 	atomic.AddInt64(&n.inflight, 1)
 	atomic.AddInt64(&n.reqs, 1)
 	n.lk.Lock()
@@ -128,19 +132,25 @@ func (n *Node) Pick() selector.DoneFunc {
 	n.lk.Unlock()
 	return func(ctx context.Context, di selector.DoneInfo) {
 		n.lk.Lock()
+		// 请求处理完成，清除链表中的元素
 		n.inflights.Remove(e)
 		n.lk.Unlock()
+		// 请求处理完成，处理中的请求-1
 		atomic.AddInt64(&n.inflight, -1)
 
+		// 本次请求完成时间
 		now := time.Now().UnixNano()
 		// get moving average ratio w
+		// 保存最新一次请求结束时的时间，并取出上次请求结束时的时间点
 		stamp := atomic.SwapInt64(&n.stamp, now)
+		// td  最近两次请求结束时间的差值
 		td := now - stamp
 		if td < 0 {
 			td = 0
 		}
 		w := math.Exp(float64(-td) / float64(tau))
 
+		// 计算本次请求延迟，并保存 （从pick 到 RPC请求完成）
 		start := e.Value.(int64)
 		lag := now - start
 		if lag < 0 {
@@ -150,6 +160,9 @@ func (n *Node) Pick() selector.DoneFunc {
 		if oldLag == 0 {
 			w = 0.0
 		}
+		// 请求延迟维度的ewma计算
+		// 计算这一次的ewma值
+		// lag 是本次的实际值（本次RPC请求时间）
 		lag = int64(float64(oldLag)*w + float64(lag)*(1.0-w))
 		atomic.StoreInt64(&n.lag, lag)
 
@@ -164,7 +177,11 @@ func (n *Node) Pick() selector.DoneFunc {
 				success = 0
 			}
 		}
+		// osucc 上一次的ewma值
 		oldSuc := atomic.LoadUint64(&n.success)
+		// 请求是否成功维度的ewma计算
+		// 计算这一次的ewma值
+		// success 是本次的实际值（成功为1000，失败为0）
 		success = uint64(float64(oldSuc)*w + float64(success)*(1.0-w))
 		atomic.StoreUint64(&n.success, success)
 	}

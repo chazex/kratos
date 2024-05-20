@@ -119,6 +119,7 @@ func (a *App) Run() error {
 		wg.Add(1)
 		eg.Go(func() error {
 			wg.Done() // here is to ensure server start has begun running before register, so defer is not needed
+			// Start函数是阻塞的(比如HTTPServer,就是阻塞在Serve()函数上，当调用srv.Stop()时，会调用HTTPServer的Shutdown，从而是的HttpServer退出，此时srv.Start()也就退出了)
 			return srv.Start(sctx)
 		})
 	}

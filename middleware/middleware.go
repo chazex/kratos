@@ -17,6 +17,7 @@ type Middleware func(Handler) Handler
 func Chain(m ...Middleware) Middleware {
 	return func(next Handler) Handler {
 		for i := len(m) - 1; i >= 0; i-- {
+			// 作用就是把next包裹进去
 			next = m[i](next)
 		}
 		return next

@@ -179,7 +179,7 @@ func NewServer(opts ...ServerOption) *Server {
 	srv.router.MethodNotAllowedHandler = http.DefaultServeMux
 	srv.router.Use(srv.filter()) // 对gorilla/mux的路由注册middleware。在路由匹配成功时，会用中间件包裹处理函数 Handler
 	srv.Server = &http.Server{   // 原生HTTP Server
-		Handler:   FilterChain(srv.filters...)(srv.router), // 把router(gorilla/mux)当作洋葱芯，包裹外层用户自定义的中间件。
+		Handler:   FilterChain(srv.filters...)(srv.router), // 把srv.router(gorilla/mux)当作洋葱芯，包裹外层用户自定义的中间件。
 		TLSConfig: srv.tlsConf,
 	}
 	return srv

@@ -178,13 +178,17 @@ func NewClient(ctx context.Context, opts ...ClientOption) (*Client, error) {
 		}
 	}
 	insecure := options.tlsConf == nil
+	// target 实际上就是go的url.Parse()的结果。
+	// 如果做服务发现，必须写成 discovery://xxx
 	target, err := parseTarget(options.endpoint, insecure)
 	if err != nil {
 		return nil, err
 	}
+	// 在当前代码源文件的第一行，使用init()函数，为GlobalSelector 做了注册，注册为轮循的负载均衡器
 	selector := selector.GlobalSelector().Build()
 	var r *resolver
 	if options.discovery != nil { // 在有服务发现的前提下，我们才做负载均衡
+		// 如果要做服务发现，target.Scheme必须是discovery，不能写成http,https.
 		if target.Scheme == "discovery" {
 			if r, err = newResolver(ctx, options.discovery, target, selector, options.block, insecure, options.subsetSize); err != nil {
 				return nil, fmt.Errorf("[http client] new resolver failed!err: %v", options.endpoint)
@@ -213,6 +217,7 @@ func (client *Client) Invoke(ctx context.Context, method, path string, args inte
 		body        io.Reader
 	)
 	c := defaultCallInfo(path)
+	// 调用前的钩子函数
 	for _, o := range opts {
 		if err := o.before(&c); err != nil {
 			return err
@@ -290,10 +295,13 @@ func (client *Client) Do(req *http.Request, opts ...CallOption) (*http.Response,
 func (client *Client) do(req *http.Request) (*http.Response, error) {
 	var done func(context.Context, selector.DoneInfo)
 	if client.r != nil {
+		// 有服务发现的情况
 		var (
 			err  error
 			node selector.Node
 		)
+		// 负载均衡器来选择请求的节点
+		// done 执行完成http请求之后，调用done方法，来做一些统计，用于计算负载吧？
 		if node, done, err = client.selector.Select(req.Context(), selector.WithNodeFilter(client.opts.nodeFilters...)); err != nil { // 用负载均衡selector选出一个可用节点
 			return nil, errors.ServiceUnavailable("NODE_NOT_FOUND", err.Error())
 		}
@@ -302,9 +310,13 @@ func (client *Client) do(req *http.Request) (*http.Response, error) {
 		} else {
 			req.URL.Scheme = "https"
 		}
+
+		// 依据服务发现获取到的地址，修改请求地址
 		req.URL.Host = node.Address()
 		req.Host = node.Address()
 	}
+
+	// 使用原生http client发送请求
 	resp, err := client.cc.Do(req)
 	if err == nil {
 		err = client.opts.errorDecoder(req.Context(), resp)
